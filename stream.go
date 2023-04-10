@@ -12,6 +12,7 @@ var streamsMap = make(map[uint32]*RTPStream)
 type RTPStream struct {
 	ssrc    uint32
 	Len     int
+	LastSeq uint16
 	Payload [][]byte
 }
 
@@ -34,21 +35,30 @@ func (r *RTPStream) WriteWav() {
 
 func AddSource(packetSource *gopacket.PacketSource) {
 	for packet := range packetSource.Packets() {
-		ssrc, payload := DecodePCM(packet)
+		wp := DecodePCM(packet)
+
+		if wp == nil {
+			continue
+		}
+
+		ssrc := wp.RTPPacket.SSRC
+		payload := wp.PCM
 
 		if payload == nil {
 			continue
 		}
 
-		// TODO:
-		// 检查序号，去除重复
-
-		if _, ok := streamsMap[ssrc]; !ok {
+		if v, ok := streamsMap[ssrc]; !ok {
 			streamsMap[ssrc] = &RTPStream{
-				ssrc: ssrc,
+				ssrc:    ssrc,
+				LastSeq: wp.RTPPacket.SequenceNumber,
 			}
+		} else if wp.RTPPacket.SequenceNumber <= v.LastSeq {
+			// 出现重复的序号，跳过
+			continue
 		} else {
-
+			// 更新序号
+			v.LastSeq = wp.RTPPacket.SequenceNumber
 		}
 
 		streamsMap[ssrc].Payload = append(streamsMap[ssrc].Payload, payload)

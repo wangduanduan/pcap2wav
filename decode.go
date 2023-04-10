@@ -14,10 +14,12 @@ const (
 	PCMU = 0
 )
 
-type Packet struct {
+type WavPacket struct {
+	RTPPacket rtp.Packet
+	PCM       []byte
 }
 
-func DecodePCM(p gopacket.Packet) (uint32, []byte) {
+func DecodePCM(p gopacket.Packet) *WavPacket {
 	if udpLayer := p.Layer(layers.LayerTypeUDP); udpLayer != nil {
 		payload := udpLayer.LayerPayload()
 
@@ -25,18 +27,24 @@ func DecodePCM(p gopacket.Packet) (uint32, []byte) {
 
 		if err := oneRTP.Unmarshal(payload); err != nil {
 			fmt.Printf("rtp parse error %v", err)
-			return 0, nil
+			return nil
+		}
+
+		wp := WavPacket{
+			RTPPacket: oneRTP,
 		}
 
 		switch oneRTP.PayloadType {
 		case PCMU:
-			return oneRTP.SSRC, g711.DecodeUlaw(oneRTP.Payload)
+			wp.PCM = g711.DecodeUlaw(oneRTP.Payload)
+			return &wp
 		case PCMA:
-			return oneRTP.SSRC, g711.DecodeAlaw(oneRTP.Payload)
+			wp.PCM = g711.DecodeAlaw(oneRTP.Payload)
+			return &wp
 		default:
-			return 0, nil
+			return nil
 		}
 	}
 
-	return 0, nil
+	return nil
 }

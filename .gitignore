@@ -13,6 +13,7 @@
 *.wav
 *.pcm
 *.DS_Store
+pcap2wav
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
